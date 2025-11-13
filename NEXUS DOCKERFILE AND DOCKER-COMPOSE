@@ -1,0 +1,56 @@
+#DOCKER-COMPOSE.YAML
+
+version: "3.86"
+
+services:
+  nexus:
+    image: nexus:1.0.9
+    container_name: ogboo
+    ports:
+      - "8081:8081"
+    restart: unless-stopped
+    volumes:
+      - nexus-data:/opt/sonatype-work
+
+volumes:
+  nexus-data:
+
+
+
+#DOCKERFILE FOR NEXUS 3.86
+#BASE IMAGE
+FROM amazonlinux:2023
+
+RUN dnf update -y \
+&& dnf install wget tar git unzip java-17-amazon-corretto-devel -y
+
+RUN mkdir -p /opt/sonatype-work /opt/nexus
+
+WORKDIR /opt/nexus
+
+RUN wget https://download.sonatype.com/nexus/3/nexus-3.86.0-08-linux-x86_64.tar.gz \
+     && tar -xzf /opt/nexus/nexus-3.86.0-08-linux-x86_64.tar.gz \
+     && rm -f /opt/nexus/nexus-3.86.0-08-linux-x86_64.tar.gz \
+     && mv -f /opt/nexus/sonatype-work/* /opt/sonatype-work \
+     && mv -f /opt/nexus/nexus-3.86.0-08/* /opt/nexus \
+     && rm -rf /opt/nexus/nexus-3.86.0-08 \
+     && rm -rf /opt/nexus/sonatype-work
+
+RUN sed -i -E 's/^Xms[0-9]+m/Xms512m/; s/^Xmx[0-9]+m/Xmx1024m/' /opt/nexus/bin/nexus.vmoptions
+
+RUN useradd -r -d /opt/nexus -s /bin/false nexus \
+     && chown -R nexus:nexus /opt/nexus /opt/sonatype-work \
+     && chmod -R 775 /opt/nexus /opt/sonatype-work
+
+
+
+ENV APP_JAVA_HOME=/usr/lib/jvm/java-17-amazon-corretto
+ENV INSTALLER4J_JAVA_HOME=/usr/lib/jvm/java-17-amazon-corretto
+ENV PATH=/opt/nexus/bin/:$PATH
+
+EXPOSE 8081
+
+USER nexus
+
+CMD ["/opt/nexus/bin/nexus", "run"]
+                               
